@@ -103,15 +103,6 @@ export const TOOLS: ToolMeta[] = [
     iconName: "Palette",
     keywords: ["color", "hex", "rgb", "hsl", "颜色", "调色板", "取色"],
   },
-  {
-    id: "screen-capture-pin",
-    name: "屏幕截图 & 悬浮贴图",
-    description: "原生屏幕截取与剪贴板快速粘贴，支持标注、裁剪及桌面/网页窗口悬浮贴图置顶",
-    category: "daily",
-    iconName: "Pin",
-    keywords: ["screenshot", "capture", "snipaste", "pin", "截屏", "贴图", "截图", "悬浮窗"],
-    badge: "新上线",
-  },
 ];
 
 export function getToolById(id: string): ToolMeta | undefined {

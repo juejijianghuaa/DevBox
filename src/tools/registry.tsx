@@ -7,7 +7,6 @@ import PasswordGenerator from "./crypto/PasswordGenerator";
 import QrCodeGenerator from "./daily/QrCodeGenerator";
 import TextDiff from "./text/TextDiff";
 import ColorConverter from "./daily/ColorConverter";
-import ScreenCapturePin from "./media/ScreenCapturePin";
 
 export function ToolRenderer({ slug }: { slug: string }) {
   switch (slug) {
@@ -27,8 +26,6 @@ export function ToolRenderer({ slug }: { slug: string }) {
       return <TextDiff />;
     case "color-converter":
       return <ColorConverter />;
-    case "screen-capture-pin":
-      return <ScreenCapturePin />;
     default:
       return null;
   }
