@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { copyToClipboard } from "@/lib/utils";
 import {
   Copy,
@@ -16,6 +16,7 @@ import {
   Code2,
   FoldHorizontal,
   UnfoldHorizontal,
+  LocateFixed,
 } from "lucide-react";
 
 const SAMPLE_JSON = `{
@@ -52,6 +53,54 @@ function collectContainerPaths(data: unknown, prefix = "$"): string[] {
     });
   }
   return paths;
+}
+
+export interface JsonErrorInfo {
+  message: string;
+  line?: number;
+  column?: number;
+  position?: number;
+}
+
+function parseJsonError(err: unknown, text: string): JsonErrorInfo {
+  const message = err instanceof Error ? err.message : "JSON 格式有误，请检查语法";
+  let line: number | undefined;
+  let column: number | undefined;
+  let position: number | undefined;
+
+  // 1. Match (line X column Y) or line X column Y
+  const lineColMatch = message.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+  if (lineColMatch) {
+    line = parseInt(lineColMatch[1], 10);
+    column = parseInt(lineColMatch[2], 10);
+  }
+
+  // 2. Match position X
+  const posMatch = message.match(/position\s+(\d+)/i);
+  if (posMatch) {
+    position = parseInt(posMatch[1], 10);
+    if (!line && position >= 0 && position <= text.length) {
+      const upToPos = text.slice(0, position);
+      const lines = upToPos.split("\n");
+      line = lines.length;
+      column = lines[lines.length - 1].length + 1;
+    }
+  }
+
+  // 3. Fallback position from line & column
+  if (line !== undefined && position === undefined) {
+    const lines = text.split("\n");
+    let offset = 0;
+    for (let i = 0; i < line - 1 && i < lines.length; i++) {
+      offset += lines[i].length + 1;
+    }
+    if (column !== undefined) {
+      offset += Math.max(0, column - 1);
+    }
+    position = offset;
+  }
+
+  return { message, line, column, position };
 }
 
 // Tree Node Props
@@ -340,10 +389,18 @@ export default function JsonFormatter() {
   // Track collapsed paths in tree
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
 
-  // Real-time parsed JSON & formatted string
-  const { realTimeOutput, parsedJson, parseError } = useMemo(() => {
+  // Editor Refs for sync scroll and error positioning
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const gutterRef = useRef<HTMLDivElement | null>(null);
+  const highlightBackdropRef = useRef<HTMLDivElement | null>(null);
+
+  // Split lines for line numbers
+  const inputLines = useMemo(() => input.split("\n"), [input]);
+
+  // Real-time parsed JSON & formatted string & precise error detail
+  const { realTimeOutput, parsedJson, parseErrorDetail } = useMemo(() => {
     if (!input.trim()) {
-      return { realTimeOutput: "", parsedJson: null, parseError: null };
+      return { realTimeOutput: "", parsedJson: null, parseErrorDetail: null };
     }
     try {
       const parsed = JSON.parse(input);
@@ -353,14 +410,70 @@ export default function JsonFormatter() {
       } else {
         formatted = JSON.stringify(parsed, null, indent);
       }
-      return { realTimeOutput: formatted, parsedJson: parsed, parseError: null };
+      return { realTimeOutput: formatted, parsedJson: parsed, parseErrorDetail: null };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "JSON 格式有误，请检查语法";
-      return { realTimeOutput: input, parsedJson: null, parseError: msg };
+      const errorInfo = parseJsonError(err, input);
+      return { realTimeOutput: input, parsedJson: null, parseErrorDetail: errorInfo };
     }
   }, [input, indent]);
 
   const displayOutput = customOutput !== null ? customOutput : realTimeOutput;
+
+  // Sync scroll between textarea, line numbers, and backdrop
+  const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    const top = e.currentTarget.scrollTop;
+    if (gutterRef.current) gutterRef.current.scrollTop = top;
+    if (highlightBackdropRef.current) highlightBackdropRef.current.scrollTop = top;
+  };
+
+  // Jump and highlight exact error line
+  const handleJumpToError = () => {
+    if (!textareaRef.current || !parseErrorDetail) return;
+    const textarea = textareaRef.current;
+    const targetLine = parseErrorDetail.line || 1;
+    const lines = input.split("\n");
+
+    let lineStart = 0;
+    for (let i = 0; i < targetLine - 1 && i < lines.length; i++) {
+      lineStart += lines[i].length + 1;
+    }
+    const currentLineText = lines[targetLine - 1] || "";
+    const col = parseErrorDetail.column ? Math.max(0, parseErrorDetail.column - 1) : 0;
+    const selectPos = Math.min(lineStart + currentLineText.length, lineStart + col);
+
+    textarea.focus();
+    if (col > 0) {
+      textarea.setSelectionRange(selectPos, Math.min(input.length, selectPos + 1));
+    } else {
+      textarea.setSelectionRange(lineStart, lineStart + Math.max(1, currentLineText.length));
+    }
+
+    // Scroll into view centered
+    const lineHeight = 24; // 24px (h-6 / leading-6)
+    const scrollTarget = Math.max(0, (targetLine - 5) * lineHeight);
+    textarea.scrollTop = scrollTarget;
+    if (gutterRef.current) gutterRef.current.scrollTop = scrollTarget;
+    if (highlightBackdropRef.current) highlightBackdropRef.current.scrollTop = scrollTarget;
+  };
+
+  // Jump to line when clicking line number gutter
+  const handleJumpToLine = (targetLine: number) => {
+    if (!textareaRef.current) return;
+    const textarea = textareaRef.current;
+    const lines = input.split("\n");
+    let lineStart = 0;
+    for (let i = 0; i < targetLine - 1 && i < lines.length; i++) {
+      lineStart += lines[i].length + 1;
+    }
+    const currentLineText = lines[targetLine - 1] || "";
+    textarea.focus();
+    textarea.setSelectionRange(lineStart, lineStart + currentLineText.length);
+    const lineHeight = 24;
+    const scrollTarget = Math.max(0, (targetLine - 5) * lineHeight);
+    textarea.scrollTop = scrollTarget;
+    if (gutterRef.current) gutterRef.current.scrollTop = scrollTarget;
+    if (highlightBackdropRef.current) highlightBackdropRef.current.scrollTop = scrollTarget;
+  };
 
   // Manual transform handlers
   const handleSetIndent = (newIndent: 2 | 4 | "compact") => {
@@ -504,10 +617,22 @@ export default function JsonFormatter() {
       </div>
 
       {/* Error Banner */}
-      {parseError && (
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs animate-in fade-in">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <div className="font-mono break-all">{parseError}</div>
+      {parseErrorDetail && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 text-xs animate-in fade-in shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+            <div className="font-mono break-all font-medium">{parseErrorDetail.message}</div>
+          </div>
+          {parseErrorDetail.line && (
+            <button
+              onClick={handleJumpToError}
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0 hover:scale-[1.02]"
+              title="一键在输入框中定位并选中错误位置"
+            >
+              <LocateFixed className="w-3.5 h-3.5" />
+              <span>📍 定位到第 {parseErrorDetail.line} 行 {parseErrorDetail.column ? `(第 ${parseErrorDetail.column} 列)` : ""}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -516,20 +641,103 @@ export default function JsonFormatter() {
         {/* Left Input */}
         <div className="flex flex-col space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <span>输入 JSON 文本</span>
-            <span>{input.length} 字符</span>
+            <div className="flex items-center gap-2">
+              <span>输入 JSON 文本</span>
+              {parseErrorDetail?.line && (
+                <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 text-[11px] font-mono font-medium border border-red-200 dark:border-red-900/60 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  第 {parseErrorDetail.line} 行出错 (已标红)
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {parseErrorDetail?.line && (
+                <button
+                  onClick={handleJumpToError}
+                  className="text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 cursor-pointer font-medium text-xs"
+                >
+                  <LocateFixed className="w-3 h-3" />
+                  <span>跳转到错误行</span>
+                </button>
+              )}
+              <span>{input.length} 字符</span>
+            </div>
           </div>
-          <textarea
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              setCustomOutput(null);
-            }}
-            placeholder="请在此粘贴或输入 JSON 字符串，右侧将自动实时格式化..."
-            rows={18}
-            className="w-full p-3.5 font-mono text-xs sm:text-sm bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-y text-slate-800 dark:text-slate-100"
-            spellCheck={false}
-          />
+
+          {/* Code Editor with Line Numbers & Error Highlighting */}
+          <div
+            className={`relative rounded-xl border overflow-hidden bg-slate-50 dark:bg-slate-900/60 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 flex transition-colors ${
+              parseErrorDetail
+                ? "border-red-400 dark:border-red-800"
+                : "border-slate-200 dark:border-slate-800"
+            }`}
+          >
+            {/* Line Numbers Gutter */}
+            <div
+              ref={gutterRef}
+              className="select-none py-3.5 pl-2 pr-2.5 text-right font-mono text-xs text-slate-400/80 dark:text-slate-500/80 bg-slate-100/70 dark:bg-slate-900/80 border-r border-slate-200/80 dark:border-slate-800 shrink-0 overflow-hidden"
+              style={{ width: `${Math.max(42, String(inputLines.length).length * 9 + 24)}px` }}
+            >
+              {inputLines.map((_, i) => {
+                const lineNum = i + 1;
+                const isError = parseErrorDetail?.line === lineNum;
+                return (
+                  <div
+                    key={lineNum}
+                    onClick={() => handleJumpToLine(lineNum)}
+                    className={`h-6 leading-6 cursor-pointer flex items-center justify-end gap-1 px-1 rounded transition-colors ${
+                      isError
+                        ? "bg-red-500 text-white font-bold shadow-xs scale-105"
+                        : "hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800"
+                    }`}
+                    title={isError ? `第 ${lineNum} 行出错，点击定位` : `点击定位第 ${lineNum} 行`}
+                  >
+                    {isError && <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />}
+                    <span>{lineNum}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Editor Input Area */}
+            <div className="relative flex-1 min-w-0 overflow-hidden">
+              {/* Background Error Line Highlight Bar */}
+              <div
+                ref={highlightBackdropRef}
+                className="absolute inset-0 pointer-events-none py-3.5 px-3.5 overflow-hidden"
+              >
+                {inputLines.map((_, i) => {
+                  const lineNum = i + 1;
+                  const isError = parseErrorDetail?.line === lineNum;
+                  return (
+                    <div
+                      key={lineNum}
+                      className={`h-6 leading-6 -mx-3.5 px-3.5 transition-colors ${
+                        isError
+                          ? "bg-red-500/15 dark:bg-red-500/25 border-l-4 border-red-500"
+                          : ""
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  setCustomOutput(null);
+                }}
+                onScroll={handleEditorScroll}
+                placeholder="请在此粘贴或输入 JSON 字符串，右侧将自动实时格式化..."
+                rows={18}
+                className="relative w-full h-full p-3.5 font-mono text-xs sm:text-sm bg-transparent outline-none resize-y text-slate-800 dark:text-slate-100 leading-6 whitespace-pre"
+                spellCheck={false}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Right Output */}
