@@ -30,6 +30,7 @@ try {
   if (isDeployCf) {
     console.log("\n\x1b[33m[4/4] 正在执行编译并一键发布到 Cloudflare Pages...\x1b[0m");
     run("pnpm build");
+    run("npx wrangler pages functions build --outdir out");
     run("npx wrangler pages deploy out --project-name devbox --commit-dirty=true");
     console.log("\n\x1b[32m🎉 部署成功！访问地址：https://devbox-e1z.pages.dev\x1b[0m\n");
   } else {

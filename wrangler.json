@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "devbox",
+  "compatibility_date": "2024-09-01",
+  "pages_build_output_dir": "out",
+  "kv_namespaces": [
+    {
+      "binding": "DEVBOX_STATS",
+      "id": "ad0bf461381144adab72e8cfc65ef5dd"
+    }
+  ]
+}

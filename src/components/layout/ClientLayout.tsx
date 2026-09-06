@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { Header } from "./Header";
 import { SearchModal } from "../common/SearchModal";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Activity } from "lucide-react";
+import { useSiteStats } from "@/hooks/useSiteStats";
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface ClientLayoutProps {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const { totalViews } = useSiteStats();
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 transition-colors">
@@ -31,8 +33,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             <span>所有计算均在用户本地浏览器完成 · 100% 隐私保护</span>
           </div>
 
-          <div className="flex items-center gap-1">
-            <span>Built with Next.js & Tailwind CSS</span>
+          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
+            <Activity className="w-3.5 h-3.5 text-blue-500" />
+            <span>全站累计访问:</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              {totalViews !== null ? totalViews.toLocaleString() : "..."}
+            </span>
+            <span>次</span>
           </div>
         </div>
       </footer>

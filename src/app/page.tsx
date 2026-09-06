@@ -13,16 +13,13 @@ import {
   Clock,
   ShieldCheck,
   ArrowRight,
-  Activity,
 } from "lucide-react";
-import { useToolStats } from "@/hooks/useToolStats";
 
 export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | "favorites" | "recent">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const { favorites, toggleFavorite, isFavorite, mounted: favMounted } = useFavorites();
   const { recentTools } = useRecentTools();
-  const { getToolStats, getTotalStats, mounted: statsMounted } = useToolStats();
 
   // Filter tools based on category and query
   const displayedTools = useMemo(() => {
@@ -55,20 +52,9 @@ export default function HomePage() {
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
       {/* Hero Section */}
       <div className="text-center space-y-4 max-w-3xl mx-auto pt-4 pb-2">
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/60 text-blue-600 dark:text-blue-400 text-xs font-medium">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>纯前端客户端运行 · 零数据上云 · 极致保护隐私</span>
-          </div>
-
-          {statsMounted && getTotalStats().grandTotal > 0 && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/70 text-xs text-slate-600 dark:text-slate-300">
-              <Activity className="w-3.5 h-3.5 text-blue-500" />
-              <span>今日打开 <strong className="font-semibold text-slate-900 dark:text-white">{getTotalStats().todayTotal}</strong> 次</span>
-              <span className="text-slate-300 dark:text-slate-600">·</span>
-              <span>历史打开 <strong className="font-semibold text-slate-900 dark:text-white">{getTotalStats().grandTotal}</strong> 次</span>
-            </div>
-          )}
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/60 text-blue-600 dark:text-blue-400 text-xs font-medium">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>纯前端客户端运行 · 零数据上云 · 极致保护隐私</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
@@ -208,14 +194,11 @@ export default function HomePage() {
                     </Link>
                   </div>
 
-                  {/* Bottom: Stats & Enter Link */}
-                  <div className="pt-3.5 mt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
-                      <Activity className="w-3 h-3 text-blue-500/70 shrink-0" />
-                      <span>今日 {statsMounted ? getToolStats(tool.id).todayCount : 0}</span>
-                      <span className="text-slate-300 dark:text-slate-700">·</span>
-                      <span>历史 {statsMounted ? getToolStats(tool.id).totalCount : 0}</span>
-                    </div>
+                  {/* Bottom: Enter Link */}
+                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                      {tool.category}
+                    </span>
                     <Link
                       href={`/tools/${tool.id}`}
                       className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"

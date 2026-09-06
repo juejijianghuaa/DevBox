@@ -13,11 +13,9 @@ import {
   Check,
   ArrowLeft,
   Sparkles,
-  Activity,
 } from "lucide-react";
 import { copyToClipboard } from "@/lib/utils";
 import { TOOLS } from "@/config/tools";
-import { useToolStats } from "@/hooks/useToolStats";
 
 interface ToolContainerProps {
   tool: ToolMeta;
@@ -27,19 +25,13 @@ interface ToolContainerProps {
 export function ToolContainer({ tool, children }: ToolContainerProps) {
   const { isFavorite, toggleFavorite, mounted: favMounted } = useFavorites();
   const { addRecentTool } = useRecentTools();
-  const { getToolStats, recordToolOpen, mounted: statsMounted } = useToolStats();
   const [copied, setCopied] = useState(false);
-  const recordedRef = React.useRef<string | null>(null);
 
   const ribbonRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     addRecentTool(tool.id);
-    if (recordedRef.current !== tool.id) {
-      recordedRef.current = tool.id;
-      recordToolOpen(tool.id);
-    }
-  }, [tool.id, addRecentTool, recordToolOpen]);
+  }, [tool.id, addRecentTool]);
 
   // Support mouse wheel horizontal scrolling when hovered over the quick ribbon
   useEffect(() => {
@@ -100,7 +92,7 @@ export function ToolContainer({ tool, children }: ToolContainerProps) {
               <DynamicIcon name={tool.iconName} className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
                   {tool.name}
                 </h1>
@@ -109,12 +101,6 @@ export function ToolContainer({ tool, children }: ToolContainerProps) {
                     {tool.badge}
                   </span>
                 )}
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/70 text-xs text-slate-600 dark:text-slate-300 select-none">
-                  <Activity className="w-3 h-3 text-blue-500 shrink-0" />
-                  <span>今日打开 <strong className="font-semibold text-slate-900 dark:text-white">{statsMounted ? getToolStats(tool.id).todayCount : 0}</strong> 次</span>
-                  <span className="text-slate-300 dark:text-slate-600">·</span>
-                  <span>历史打开 <strong className="font-semibold text-slate-900 dark:text-white">{statsMounted ? getToolStats(tool.id).totalCount : 0}</strong> 次</span>
-                </div>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                 {tool.description}
