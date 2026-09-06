@@ -44,6 +44,15 @@ export const TOOLS: ToolMeta[] = [
     badge: "热门",
   },
   {
+    id: "ip-lookup",
+    name: "IP 地址与归属地查询",
+    description: "实时侦测本机公网 IP、地理位置与运营商，支持查询任意 IP 与域名归属",
+    category: "dev",
+    iconName: "Globe",
+    keywords: ["ip", "iplookup", "geoip", "network", "isp", "公网ip", "地址查询", "运营商"],
+    badge: "新上线",
+  },
+  {
     id: "timestamp-converter",
     name: "时间戳转换器",
     description: "Unix 时间戳与标准日期互转，支持毫秒/秒与相对时间计算",
