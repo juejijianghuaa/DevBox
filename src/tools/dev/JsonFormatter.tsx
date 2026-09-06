@@ -330,8 +330,8 @@ function JsonTreeNode({
 
 export default function JsonFormatter() {
   const [input, setInput] = useState(SAMPLE_JSON);
-  const [output, setOutput] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [indent, setIndent] = useState<2 | 4 | "compact">(2);
+  const [customOutput, setCustomOutput] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // View Mode: 'tree' (default for intuitive folding) or 'text'
@@ -340,80 +340,60 @@ export default function JsonFormatter() {
   // Track collapsed paths in tree
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
 
-  // Parse JSON data for tree view
-  const parsedJson = useMemo(() => {
-    const raw = output || input;
-    if (!raw.trim()) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }, [output, input]);
-
-  // Format
-  const handleFormat = (indentVal: 2 | 4 | "tab" = 2) => {
+  // Real-time parsed JSON & formatted string
+  const { realTimeOutput, parsedJson, parseError } = useMemo(() => {
     if (!input.trim()) {
-      setOutput("");
-      setError(null);
-      return;
+      return { realTimeOutput: "", parsedJson: null, parseError: null };
     }
     try {
       const parsed = JSON.parse(input);
-      const space = indentVal === "tab" ? "\t" : indentVal;
-      setOutput(JSON.stringify(parsed, null, space));
-      setError(null);
+      let formatted = "";
+      if (indent === "compact") {
+        formatted = JSON.stringify(parsed);
+      } else {
+        formatted = JSON.stringify(parsed, null, indent);
+      }
+      return { realTimeOutput: formatted, parsedJson: parsed, parseError: null };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "JSON 格式有误，请检查语法";
-      setError(msg);
+      return { realTimeOutput: input, parsedJson: null, parseError: msg };
     }
+  }, [input, indent]);
+
+  const displayOutput = customOutput !== null ? customOutput : realTimeOutput;
+
+  // Manual transform handlers
+  const handleSetIndent = (newIndent: 2 | 4 | "compact") => {
+    setIndent(newIndent);
+    setCustomOutput(null);
   };
 
-  // Minify
-  const handleMinify = () => {
-    if (!input.trim()) return;
-    try {
-      const parsed = JSON.parse(input);
-      setOutput(JSON.stringify(parsed));
-      setError(null);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "JSON 格式有误，请检查语法";
-      setError(msg);
-    }
-  };
-
-  // Escape
   const handleEscape = () => {
     if (!input.trim()) return;
     try {
-      setOutput(JSON.stringify(input));
-      setError(null);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "转义失败";
-      setError(msg);
+      setCustomOutput(JSON.stringify(displayOutput || input));
+    } catch {
+      // fallback
     }
   };
 
-  // Unescape
   const handleUnescape = () => {
     if (!input.trim()) return;
     try {
       const unescaped = JSON.parse(input);
       if (typeof unescaped === "string") {
-        setOutput(unescaped);
+        setCustomOutput(unescaped);
       } else {
-        setOutput(JSON.stringify(unescaped, null, 2));
+        setCustomOutput(JSON.stringify(unescaped, null, 2));
       }
-      setError(null);
     } catch {
-      setOutput(input.replace(/\\"/g, '"').replace(/\\\\/g, "\\"));
-      setError(null);
+      setCustomOutput(input.replace(/\\"/g, '"').replace(/\\\\/g, "\\"));
     }
   };
 
   // Copy
   const handleCopy = async () => {
-    const textToCopy = output || input;
+    const textToCopy = displayOutput || input;
     if (!textToCopy) return;
     const success = await copyToClipboard(textToCopy);
     if (success) {
@@ -454,21 +434,33 @@ export default function JsonFormatter() {
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/80 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => handleFormat(2)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+            onClick={() => handleSetIndent(2)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border ${
+              indent === 2 && !customOutput
+                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            格式化 (2 空格)
+            2 空格 (默认)
           </button>
           <button
-            onClick={() => handleFormat(4)}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg transition-colors cursor-pointer"
+            onClick={() => handleSetIndent(4)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer border ${
+              indent === 4 && !customOutput
+                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
           >
             4 空格
           </button>
           <button
-            onClick={handleMinify}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => handleSetIndent("compact")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border ${
+              indent === "compact" && !customOutput
+                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
           >
             <Minimize2 className="w-3.5 h-3.5" />
             压缩紧凑
@@ -492,8 +484,7 @@ export default function JsonFormatter() {
           <button
             onClick={() => {
               setInput(SAMPLE_JSON);
-              setOutput("");
-              setError(null);
+              setCustomOutput(null);
             }}
             className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
           >
@@ -502,8 +493,7 @@ export default function JsonFormatter() {
           <button
             onClick={() => {
               setInput("");
-              setOutput("");
-              setError(null);
+              setCustomOutput(null);
             }}
             className="p-1.5 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
             title="清空内容"
@@ -514,10 +504,10 @@ export default function JsonFormatter() {
       </div>
 
       {/* Error Banner */}
-      {error && (
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs">
+      {parseError && (
+        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs animate-in fade-in">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <div className="font-mono">{error}</div>
+          <div className="font-mono break-all">{parseError}</div>
         </div>
       )}
 
@@ -533,9 +523,9 @@ export default function JsonFormatter() {
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
-              setError(null);
+              setCustomOutput(null);
             }}
-            placeholder="请在此粘贴或输入 JSON 字符串..."
+            placeholder="请在此粘贴或输入 JSON 字符串，右侧将自动实时格式化..."
             rows={18}
             className="w-full p-3.5 font-mono text-xs sm:text-sm bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-y text-slate-800 dark:text-slate-100"
             spellCheck={false}
@@ -546,7 +536,7 @@ export default function JsonFormatter() {
         <div className="flex flex-col space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">处理结果</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-200">处理结果 (实时)</span>
 
               {/* View Switcher: Tree vs Text */}
               <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-100 dark:bg-slate-800">
@@ -569,7 +559,7 @@ export default function JsonFormatter() {
                       ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
                       : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                   }`}
-                  title="纯文本视图：方便直接全选与原生文本查看"
+                  title="纯文本视图：实时展示格式化文本代码"
                 >
                   <Code2 className="w-3 h-3" />
                   <span>纯文本</span>
@@ -600,10 +590,10 @@ export default function JsonFormatter() {
             </div>
 
             <div className="flex items-center gap-3">
-              <span>{(output || input).length} 字符</span>
+              <span>{displayOutput.length} 字符</span>
               <button
                 onClick={handleCopy}
-                disabled={!output && !input}
+                disabled={!displayOutput}
                 className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -636,8 +626,8 @@ export default function JsonFormatter() {
           ) : (
             <textarea
               readOnly
-              value={output || (input && !error ? "点击上方格式化按钮查看结果" : "")}
-              placeholder="格式化结果将展示在这里..."
+              value={displayOutput}
+              placeholder="格式化结果将实时展示在这里..."
               rows={18}
               className="w-full p-3.5 font-mono text-xs sm:text-sm bg-slate-50/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl outline-none resize-y text-slate-800 dark:text-slate-100"
               spellCheck={false}
