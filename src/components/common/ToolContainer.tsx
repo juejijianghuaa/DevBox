@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Check,
   ArrowLeft,
-  Sparkles,
 } from "lucide-react";
 import { copyToClipboard } from "@/lib/utils";
 import { TOOLS } from "@/config/tools";
@@ -33,7 +32,7 @@ export function ToolContainer({ tool, children }: ToolContainerProps) {
     addRecentTool(tool.id);
   }, [tool.id, addRecentTool]);
 
-  // Support mouse wheel horizontal scrolling when hovered over the quick ribbon
+  // Support fast mouse wheel horizontal scrolling when hovered over the quick ribbon
   useEffect(() => {
     const el = ribbonRef.current;
     if (!el) return;
@@ -41,7 +40,7 @@ export function ToolContainer({ tool, children }: ToolContainerProps) {
     const onWheel = (e: WheelEvent) => {
       if (el.scrollWidth > el.clientWidth && e.deltaY !== 0) {
         e.preventDefault();
-        el.scrollLeft += e.deltaY;
+        el.scrollLeft += e.deltaY * 2.5;
       }
     };
 
@@ -154,15 +153,11 @@ export function ToolContainer({ tool, children }: ToolContainerProps) {
         </div>
       </div>
 
-      {/* Quick Switch Ribbon: Direct jump to any other tool with 1 click & mouse wheel scroll */}
+      {/* Quick Switch Ribbon: Direct jump to any other tool with 1 click & fast mouse wheel scroll */}
       <div
         ref={ribbonRef}
-        className="flex items-center gap-1.5 overflow-x-auto pb-1.5 text-xs scroll-smooth"
+        className="flex items-center gap-1.5 overflow-x-auto pb-1.5 text-xs"
       >
-        <span className="text-slate-400 font-medium shrink-0 mr-1 flex items-center gap-1 select-none">
-          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-          快捷直达:
-        </span>
         {TOOLS.map((t) => {
           const isActive = t.id === tool.id;
           return (
