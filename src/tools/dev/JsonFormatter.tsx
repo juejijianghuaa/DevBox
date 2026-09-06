@@ -1,8 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { copyToClipboard } from "@/lib/utils";
-import { Copy, Check, Trash2, Minimize2, ArrowRightLeft, Sparkles, AlertCircle } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Trash2,
+  Minimize2,
+  ArrowRightLeft,
+  Sparkles,
+  AlertCircle,
+  ChevronRight,
+  ChevronDown,
+  ListTree,
+  Code2,
+  FoldHorizontal,
+  UnfoldHorizontal,
+} from "lucide-react";
 
 const SAMPLE_JSON = `{
   "name": "DevBox",
@@ -24,15 +38,321 @@ const SAMPLE_JSON = `{
   }
 }`;
 
+// Helper: Collect all object/array container paths in JSON
+function collectContainerPaths(data: unknown, prefix = "$"): string[] {
+  if (data === null || typeof data !== "object") return [];
+  const paths: string[] = [prefix];
+  if (Array.isArray(data)) {
+    data.forEach((item, index) => {
+      paths.push(...collectContainerPaths(item, `${prefix}[${index}]`));
+    });
+  } else {
+    Object.entries(data as Record<string, unknown>).forEach(([key, val]) => {
+      paths.push(...collectContainerPaths(val, `${prefix}.${key}`));
+    });
+  }
+  return paths;
+}
+
+// Tree Node Props
+interface JsonTreeNodeProps {
+  name?: string | number;
+  value: unknown;
+  path: string;
+  isLast: boolean;
+  collapsedPaths: Set<string>;
+  onToggle: (path: string) => void;
+}
+
+// Interactive JSON Tree Node Component
+function JsonTreeNode({
+  name,
+  value,
+  path,
+  isLast,
+  collapsedPaths,
+  onToggle,
+}: JsonTreeNodeProps) {
+  const [copiedVal, setCopiedVal] = useState(false);
+
+  const handleCopyValue = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const str = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+    const ok = await copyToClipboard(str);
+    if (ok) {
+      setCopiedVal(true);
+      setTimeout(() => setCopiedVal(false), 1500);
+    }
+  };
+
+  // Render Primitives
+  if (value === null) {
+    return (
+      <div className="group flex items-center py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 rounded px-1 -mx-1 font-mono text-xs">
+        <span className="w-4 inline-block" />
+        {name !== undefined && (
+          <span className="text-blue-600 dark:text-blue-400 mr-1.5 font-medium">
+            &quot;{name}&quot;:
+          </span>
+        )}
+        <span className="text-slate-400 dark:text-slate-500 italic">null</span>
+        {!isLast && <span className="text-slate-400">,</span>}
+        <button
+          onClick={handleCopyValue}
+          className="opacity-0 group-hover:opacity-100 ml-2 p-0.5 text-slate-400 hover:text-blue-500 transition-opacity"
+          title="复制此值"
+        >
+          {copiedVal ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+        </button>
+      </div>
+    );
+  }
+
+  if (typeof value === "boolean") {
+    return (
+      <div className="group flex items-center py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 rounded px-1 -mx-1 font-mono text-xs">
+        <span className="w-4 inline-block" />
+        {name !== undefined && (
+          <span className="text-blue-600 dark:text-blue-400 mr-1.5 font-medium">
+            &quot;{name}&quot;:
+          </span>
+        )}
+        <span className="text-purple-600 dark:text-purple-400 font-semibold">
+          {value ? "true" : "false"}
+        </span>
+        {!isLast && <span className="text-slate-400">,</span>}
+        <button
+          onClick={handleCopyValue}
+          className="opacity-0 group-hover:opacity-100 ml-2 p-0.5 text-slate-400 hover:text-blue-500 transition-opacity"
+          title="复制此值"
+        >
+          {copiedVal ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+        </button>
+      </div>
+    );
+  }
+
+  if (typeof value === "number") {
+    return (
+      <div className="group flex items-center py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 rounded px-1 -mx-1 font-mono text-xs">
+        <span className="w-4 inline-block" />
+        {name !== undefined && (
+          <span className="text-blue-600 dark:text-blue-400 mr-1.5 font-medium">
+            &quot;{name}&quot;:
+          </span>
+        )}
+        <span className="text-amber-600 dark:text-amber-400 font-medium">{value}</span>
+        {!isLast && <span className="text-slate-400">,</span>}
+        <button
+          onClick={handleCopyValue}
+          className="opacity-0 group-hover:opacity-100 ml-2 p-0.5 text-slate-400 hover:text-blue-500 transition-opacity"
+          title="复制此值"
+        >
+          {copiedVal ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+        </button>
+      </div>
+    );
+  }
+
+  if (typeof value === "string") {
+    return (
+      <div className="group flex items-center py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 rounded px-1 -mx-1 font-mono text-xs">
+        <span className="w-4 inline-block" />
+        {name !== undefined && (
+          <span className="text-blue-600 dark:text-blue-400 mr-1.5 font-medium">
+            &quot;{name}&quot;:
+          </span>
+        )}
+        <span className="text-emerald-600 dark:text-emerald-400 break-all select-text">
+          &quot;{value}&quot;
+        </span>
+        {!isLast && <span className="text-slate-400">,</span>}
+        <button
+          onClick={handleCopyValue}
+          className="opacity-0 group-hover:opacity-100 ml-2 p-0.5 text-slate-400 hover:text-blue-500 transition-opacity shrink-0"
+          title="复制此值"
+        >
+          {copiedVal ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+        </button>
+      </div>
+    );
+  }
+
+  // Render Arrays
+  if (Array.isArray(value)) {
+    const isCollapsed = collapsedPaths.has(path);
+    const count = value.length;
+
+    return (
+      <div className="font-mono text-xs">
+        <div
+          onClick={() => onToggle(path)}
+          className="group flex items-center py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 rounded px-1 -mx-1 cursor-pointer select-none"
+        >
+          <span className="w-4 flex items-center justify-center shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors">
+            {isCollapsed ? (
+              <ChevronRight className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </span>
+
+          {name !== undefined && (
+            <span className="text-blue-600 dark:text-blue-400 mr-1.5 font-medium">
+              &quot;{name}&quot;:
+            </span>
+          )}
+
+          {isCollapsed ? (
+            <span className="flex items-center gap-1.5">
+              <span className="text-slate-500 dark:text-slate-400 font-bold">[ ... ]</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-500 font-sans">
+                {count} items
+              </span>
+              {!isLast && <span className="text-slate-400">,</span>}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-slate-500">
+              <span className="font-bold">[</span>
+              <span className="text-[10px] opacity-60 font-sans">({count})</span>
+            </span>
+          )}
+
+          <button
+            onClick={handleCopyValue}
+            className="opacity-0 group-hover:opacity-100 ml-2 p-0.5 text-slate-400 hover:text-blue-500 transition-opacity"
+            title="复制整个数组"
+          >
+            {copiedVal ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <>
+            <div className="pl-3.5 ml-2 border-l border-slate-200/90 dark:border-slate-800/90 my-0.5">
+              {value.map((item, idx) => (
+                <JsonTreeNode
+                  key={idx}
+                  name={idx}
+                  value={item}
+                  path={`${path}[${idx}]`}
+                  isLast={idx === value.length - 1}
+                  collapsedPaths={collapsedPaths}
+                  onToggle={onToggle}
+                />
+              ))}
+            </div>
+            <div className="pl-4 text-slate-500 font-mono text-xs">
+              ]{!isLast && <span className="text-slate-400">,</span>}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Render Objects
+  if (typeof value === "object") {
+    const isCollapsed = collapsedPaths.has(path);
+    const entries = Object.entries(value as Record<string, unknown>);
+    const count = entries.length;
+
+    return (
+      <div className="font-mono text-xs">
+        <div
+          onClick={() => onToggle(path)}
+          className="group flex items-center py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 rounded px-1 -mx-1 cursor-pointer select-none"
+        >
+          <span className="w-4 flex items-center justify-center shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors">
+            {isCollapsed ? (
+              <ChevronRight className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </span>
+
+          {name !== undefined && (
+            <span className="text-blue-600 dark:text-blue-400 mr-1.5 font-medium">
+              &quot;{name}&quot;:
+            </span>
+          )}
+
+          {isCollapsed ? (
+            <span className="flex items-center gap-1.5">
+              <span className="text-slate-500 dark:text-slate-400 font-bold">&#123; ... &#125;</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-500 font-sans">
+                {count} keys
+              </span>
+              {!isLast && <span className="text-slate-400">,</span>}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-slate-500">
+              <span className="font-bold">&#123;</span>
+              <span className="text-[10px] opacity-60 font-sans">({count})</span>
+            </span>
+          )}
+
+          <button
+            onClick={handleCopyValue}
+            className="opacity-0 group-hover:opacity-100 ml-2 p-0.5 text-slate-400 hover:text-blue-500 transition-opacity"
+            title="复制整个对象"
+          >
+            {copiedVal ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <>
+            <div className="pl-3.5 ml-2 border-l border-slate-200/90 dark:border-slate-800/90 my-0.5">
+              {entries.map(([childKey, childVal], idx) => (
+                <JsonTreeNode
+                  key={childKey}
+                  name={childKey}
+                  value={childVal}
+                  path={`${path}.${childKey}`}
+                  isLast={idx === entries.length - 1}
+                  collapsedPaths={collapsedPaths}
+                  onToggle={onToggle}
+                />
+              ))}
+            </div>
+            <div className="pl-4 text-slate-500 font-mono text-xs">
+              &#125;{!isLast && <span className="text-slate-400">,</span>}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function JsonFormatter() {
   const [input, setInput] = useState(SAMPLE_JSON);
   const [output, setOutput] = useState("");
-  const [indent, setIndent] = useState<2 | 4 | "tab">(2);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // View Mode: 'tree' (default for intuitive folding) or 'text'
+  const [viewMode, setViewMode] = useState<"tree" | "text">("tree");
+
+  // Track collapsed paths in tree
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
+
+  // Parse JSON data for tree view
+  const parsedJson = useMemo(() => {
+    const raw = output || input;
+    if (!raw.trim()) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, [output, input]);
+
   // Format
-  const handleFormat = (indentVal: 2 | 4 | "tab" = indent) => {
+  const handleFormat = (indentVal: 2 | 4 | "tab" = 2) => {
     if (!input.trim()) {
       setOutput("");
       setError(null);
@@ -86,12 +406,12 @@ export default function JsonFormatter() {
       }
       setError(null);
     } catch {
-      // Manual replace fallback
       setOutput(input.replace(/\\"/g, '"').replace(/\\\\/g, "\\"));
       setError(null);
     }
   };
 
+  // Copy
   const handleCopy = async () => {
     const textToCopy = output || input;
     if (!textToCopy) return;
@@ -102,26 +422,46 @@ export default function JsonFormatter() {
     }
   };
 
+  // Tree Toggle
+  const togglePath = (path: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
+
+  // Expand All
+  const handleExpandAll = () => {
+    setCollapsedPaths(new Set());
+  };
+
+  // Collapse All
+  const handleCollapseAll = () => {
+    if (parsedJson) {
+      const allPaths = collectContainerPaths(parsedJson);
+      setCollapsedPaths(new Set(allPaths));
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Control Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/80 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => {
-              setIndent(2);
-              handleFormat(2);
-            }}
+            onClick={() => handleFormat(2)}
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             格式化 (2 空格)
           </button>
           <button
-            onClick={() => {
-              setIndent(4);
-              handleFormat(4);
-            }}
+            onClick={() => handleFormat(4)}
             className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg transition-colors cursor-pointer"
           >
             4 空格
@@ -150,8 +490,12 @@ export default function JsonFormatter() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setInput(SAMPLE_JSON)}
-            className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            onClick={() => {
+              setInput(SAMPLE_JSON);
+              setOutput("");
+              setError(null);
+            }}
+            className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
           >
             填入示例
           </button>
@@ -200,28 +544,105 @@ export default function JsonFormatter() {
 
         {/* Right Output */}
         <div className="flex flex-col space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <span>处理结果</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
             <div className="flex items-center gap-2">
-              <span>{output.length} 字符</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-200">处理结果</span>
+
+              {/* View Switcher: Tree vs Text */}
+              <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-100 dark:bg-slate-800">
+                <button
+                  onClick={() => setViewMode("tree")}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                    viewMode === "tree"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                  title="树状视图：支持展开和折叠对象/数组"
+                >
+                  <ListTree className="w-3 h-3" />
+                  <span>树状视图</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("text")}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                    viewMode === "text"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                  title="纯文本视图：方便直接全选与原生文本查看"
+                >
+                  <Code2 className="w-3 h-3" />
+                  <span>纯文本</span>
+                </button>
+              </div>
+
+              {/* Expand / Collapse All buttons (Tree Mode only) */}
+              {viewMode === "tree" && parsedJson !== null && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleExpandAll}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                    title="全部展开"
+                  >
+                    <UnfoldHorizontal className="w-3 h-3 text-blue-500" />
+                    <span>展开</span>
+                  </button>
+                  <button
+                    onClick={handleCollapseAll}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                    title="全部折叠"
+                  >
+                    <FoldHorizontal className="w-3 h-3 text-amber-500" />
+                    <span>折叠</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span>{(output || input).length} 字符</span>
               <button
                 onClick={handleCopy}
-                disabled={!output}
+                disabled={!output && !input}
                 className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer"
               >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copied ? "已复制" : "复制结果"}</span>
               </button>
             </div>
           </div>
-          <textarea
-            readOnly
-            value={output || (input && !error ? "点击上方格式化按钮查看结果" : "")}
-            placeholder="格式化结果将展示在这里..."
-            rows={18}
-            className="w-full p-3.5 font-mono text-xs sm:text-sm bg-slate-50/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl outline-none resize-y text-slate-800 dark:text-slate-100"
-            spellCheck={false}
-          />
+
+          {/* View Mode Container */}
+          {viewMode === "tree" ? (
+            <div className="w-full min-h-[384px] max-h-[600px] overflow-auto p-4 bg-slate-50/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl">
+              {parsedJson !== null ? (
+                <div className="p-1">
+                  <JsonTreeNode
+                    value={parsedJson}
+                    path="$"
+                    isLast={true}
+                    collapsedPaths={collapsedPaths}
+                    onToggle={togglePath}
+                  />
+                </div>
+              ) : (
+                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs">
+                  <AlertCircle className="w-6 h-6 mb-2 opacity-60 text-amber-500" />
+                  <span>当前内容不是合法的 JSON 格式，无法解析树状结构</span>
+                  <span className="text-[11px] mt-1 text-slate-500">可切换到“纯文本”视图查看原始输出</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <textarea
+              readOnly
+              value={output || (input && !error ? "点击上方格式化按钮查看结果" : "")}
+              placeholder="格式化结果将展示在这里..."
+              rows={18}
+              className="w-full p-3.5 font-mono text-xs sm:text-sm bg-slate-50/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl outline-none resize-y text-slate-800 dark:text-slate-100"
+              spellCheck={false}
+            />
+          )}
         </div>
       </div>
     </div>
