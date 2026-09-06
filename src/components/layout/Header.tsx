@@ -74,11 +74,11 @@ export function Header({ onOpenSearch }: HeaderProps) {
 
           {/* GitHub link */}
           <a
-            href="https://github.com"
+            href="https://github.com/juejijianghuaa/DevBox"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            title="GitHub 源码"
+            className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title="GitHub 源码仓库"
           >
             <svg
               className="w-5 h-5 fill-current"
